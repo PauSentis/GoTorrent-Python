@@ -12,93 +12,91 @@ import copy
 
 class Peer(object):
 	_tell = ["pushGossip","pullGossip","push","init_start","stop_interval","announce"]
-	_ask = ["get_name","initArray","get_file","pull"]
+	_ask = ["initArray","get_file","pull"]
 
 	def __init__(self):
 		self.torrentFile = []
+		self.torrentPeers = {}
 
 	def initArray(self,Object):
 		self.torrentFile = Object
 
 	def announce(self,tracker,torrent):
-		tracker.announce(torrent,self.proxy,10)
+		self.torrentPeers = t.getPeers(torrent)
+		tracker.announce(torrent,self.proxy,10) #ref
 
 	def get_file(self):
 		return self.torrentFile
 
-	def get_name(self):
-		return self.id
-
-	def pull(self,chunk_id): #will not do it if have the String completed - used in GOSSIP ALGORITHM
+	def pull(self,chunk_id): #seed won't do it (ask for chunk)
 		return self.torrentFile[chunk_id]
 
-	def push(self,chunk_id, chunk_data): #nofiy peers with info - used in GOSSIP ALGORITHM
+	def push(self,chunk_id, chunk_data): #nofiy peer with chunk
 		if self.torrentFile[chunk_id] == None:
-
 			self.torrentFile[chunk_id] = chunk_data
-			print self.torrentFile
+			print self.id +  str(self.torrentFile)
 
-	def pushGossip(self,torrent):
+	def pushGossip(self):
 
-		torrentPeers = t.getPeers(torrent)
+		if self.torrentPeers != None:
+			if self.proxy in self.torrentPeers:
+				randomPeers = random.sample(self.torrentPeers, 3)
 
-		if self.proxy in torrentPeers:
-			randomPeers = random.sample(torrentPeers, 3)
+				if self.proxy in randomPeers:
 
-			if self.proxy in randomPeers:
+					newPeers = copy.copy(self.torrentPeers)
+					newPeers.pop(self.proxy)
+					randomPeers = random.sample(newPeers, 3)
 
-				newPeers = copy.copy(torrentPeers)
-				newPeers.pop(self.proxy)
-				randomPeers = random.sample(newPeers, 3)
+					peer = random.sample(randomPeers,1)
 
-			for peer in randomPeers:
-				# PUSH - GOSSIP method:(self send chunk to random peers)
-				randomPosition = random.randint(0, 8)
-				peer.push(randomPosition, self.torrentFile[randomPosition])
+					# PUSH - GOSSIP method:(self send chunk to random peer of randoms)
+					randomPosition = random.randint(0, 8)
+					peer[0].push(randomPosition, self.torrentFile[randomPosition])
 
 
-	def pullGossip(self,torrent):
+	def pullGossip(self):
 
-		torrentPeers = t.getPeers(torrent)
-		peersNoneChunks = []
-		position = 0
+		if self.torrentPeers != None:
 
-		if self.proxy in torrentPeers:
-			randomPeer = random.sample(torrentPeers, 1)
+			self.peersNoneChunks = []
+			self.position = 0
 
-			for chunk in self.torrentFile:
+			if self.proxy in self.torrentPeers:
+				randomPeer = random.sample(self.torrentPeers, 1)
 
-				if chunk == None:
-					peersNoneChunks.append(position)
+				for chunk in self.torrentFile:
 
-				position = position + 1
+					if chunk == None:
+						self.peersNoneChunks.append(self.position)
 
-			if len(peersNoneChunks) > 0:
-				randomPosition = random.sample(peersNoneChunks, 1)
+					self.position = self.position + 1
 
-				# PULL - GOSSIP method: (self ask for random not None chunk to random peer)
-				chunk = randomPeer[0].pull(randomPosition[0],future = True) #use a FUTURE, for not get None chunk
-				sleep(0.5)
+				if len(self.peersNoneChunks) > 0:
+					randomPosition = random.sample(self.peersNoneChunks, 1)
 
-				if chunk.done():
-					try:
-						if chunk.result() != None:
-							file = self.torrentFile
-							file[randomPosition[0]] = chunk.result()
-						print "PULL ---------> " + str(chunk.result())
-					except Exception, e:
-						print e
+					# PULL - GOSSIP method: (self ask for random not None chunk to random peer)
+					chunk = randomPeer[0].pull(randomPosition[0],future = True) #use a FUTURE, for not get None chunk
 
+					sleep(0.3)
+					if chunk.done():
+						try:
+							if chunk.result() != None:
+								file = self.torrentFile
+								file[randomPosition[0]] = chunk.result()
+							print "PULL " + self.id + " ---------> " + str(chunk.result())
+						except Exception, e:
+							print e
 
 	#INTERVALS:
 	def init_start(self,torrent):
-		self.peerAnounce = interval(h, 5, self.proxy, "announce", t,torrent)
-		self.peerPush = interval(h, 1, self.proxy, "pushGossip",torrent)
+		self.peerAnounce = interval(h, 6, self.proxy, "announce", t,torrent)
+		self.peerPush = interval(h, 1, self.proxy, "pushGossip")
 
 		if self.proxy != ps:
-			self.peerPull = interval(h,1, self.proxy, "pullGossip",torrent)
+			self.peerPull = interval(h,2, self.proxy, "pullGossip")
 
-		later(18, self.proxy, "stop_interval")
+		later(60, self.proxy, "stop_interval")
 
 	def stop_interval(self):
 		print "stopping interval"
@@ -108,16 +106,10 @@ class Peer(object):
 
 class Tracker(object):
 	_tell = ["announce","trackerTimeCheck","init_start","stop_interval"]
-	_ask = ["getPeers","getTorrents","getRandomPeers"]
+	_ask = ["getPeers"]
 
 	def __init__(self):
 		self.torrents = {}
-
-	def getTorrents(self):
-		return self.torrents
-
-	def getRandomPeers(self,torrent_id):
-		return random.sample(self.torrents.get(torrent_id),3)
 
 	def getPeers(self,torrent_id):
 		return  self.torrents.get(torrent_id)
@@ -128,17 +120,18 @@ class Tracker(object):
 	def trackerTimeCheck(self,torrent):
 
 		deadPeers = {}
-		for peer in  self.torrents.get(torrent):
+		if self.torrents.get(torrent) != None:
+			for peer in  self.torrents.get(torrent):
 
-			time = self.torrents.get(torrent)[peer]
-			self.announce(torrent, peer, time - 1)
+				time = self.torrents.get(torrent)[peer]
+				self.announce(torrent, peer, time - 1)
 
-			if time < 1:
-				deadPeers.setdefault(torrent, []).append(peer)
+				if time < 1:
+					deadPeers.setdefault(torrent, []).append(peer)
 
-		for torrent in deadPeers.keys():
-			for peer in deadPeers.get(torrent):
-				self.torrents.get(torrent).pop(peer,None)
+			for torrent in deadPeers.keys():
+				for peer in deadPeers.get(torrent):
+					self.torrents.get(torrent).pop(peer,None)
 
 
 
@@ -146,7 +139,7 @@ class Tracker(object):
 	def init_start(self,torrent):
 		self.timeCheck = interval(h,1, self.proxy, "trackerTimeCheck",torrent)
 
-		later(18, self.proxy, "stop_interval")
+		later(60, self.proxy, "stop_interval")
 
 	def stop_interval(self):
 		print "stopping interval"
@@ -175,15 +168,20 @@ if __name__ == '__main__':
 	p5.initArray([None, None, None, None, None, None, None, None, None])
 
 	ps.init_start("movie")
+	sleep(0.2)
 	p1.init_start("movie")
+	sleep(0.1)
 	p2.init_start("movie")
+	sleep(0.1)
 	p3.init_start("movie")
+	sleep(0.1)
 	p4.init_start("movie")
+	sleep(0.1)
 	p5.init_start("movie")
 
 	t.init_start("movie")
 
-	sleep(20)
+	sleep(63)
 
 	print "-----------"
 	print "p1: " + str(p1.get_file())
@@ -191,7 +189,5 @@ if __name__ == '__main__':
 	print "p3: " + str(p3.get_file())
 	print "p4: " + str(p4.get_file())
 	print "p5: " + str(p5.get_file())
-
-	print t.getPeers("movie")
 
 shutdown()
