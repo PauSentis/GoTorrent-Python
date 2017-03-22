@@ -28,17 +28,18 @@ class Peer(object):
 	def get_file(self):
 		return self.torrentFile
 
-	def pull(self,chunk_id): #seed won't do it (ask for chunk)
+	def pull(self,chunk_id):
 		return self.torrentFile[chunk_id]
 
-	def push(self,chunk_id, chunk_data): #nofiy peer with chunk
+	def push(self,chunk_id, chunk_data):
 		if self.torrentFile[chunk_id] == None:
 			self.torrentFile[chunk_id] = chunk_data
 			print self.id +  str(self.torrentFile)
 
-	def pushGossip(self):
+	def pushGossip(self): #deliver
 
 		if self.torrentPeers != None:
+
 			if self.proxy in self.torrentPeers:
 				randomPeers = random.sample(self.torrentPeers, 3)
 
@@ -55,7 +56,7 @@ class Peer(object):
 					peer[0].push(randomPosition, self.torrentFile[randomPosition])
 
 
-	def pullGossip(self):
+	def pullGossip(self): #ask
 
 		if self.torrentPeers != None:
 
@@ -94,7 +95,7 @@ class Peer(object):
 		self.peerPush = interval(h, 1, self.proxy, "pushGossip")
 
 		if self.proxy != ps:
-			self.peerPull = interval(h,2, self.proxy, "pullGossip")
+			self.peerPull = interval(h, 2, self.proxy, "pullGossip")
 
 		later(60, self.proxy, "stop_interval")
 
@@ -168,7 +169,7 @@ if __name__ == '__main__':
 	p5.initArray([None, None, None, None, None, None, None, None, None])
 
 	ps.init_start("movie")
-	sleep(0.2)
+	sleep(0.1)
 	p1.init_start("movie")
 	sleep(0.1)
 	p2.init_start("movie")
@@ -178,7 +179,7 @@ if __name__ == '__main__':
 	p4.init_start("movie")
 	sleep(0.1)
 	p5.init_start("movie")
-
+	sleep(0.1)
 	t.init_start("movie")
 
 	sleep(63)
