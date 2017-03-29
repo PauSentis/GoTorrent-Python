@@ -1,7 +1,12 @@
 from pyactor.context import set_context, create_host, sleep, shutdown, interval, later
 
+import plotly.plotly as py
+import plotly.graph_objs as go
+
+import plotly
 import random
 import copy
+
 
 #tell = assincronous
 #ask = sincronous
@@ -12,11 +17,12 @@ import copy
 
 class Peer(object):
 	_tell = ["pushGossip","pullGossip","push","init_start","stop_interval","announce"]
-	_ask = ["initArray","get_file","pull"]
+	_ask = ["initArray","get_file","pull","chunk_rounds"]
 
 	def __init__(self):
 		self.torrentFile = []
 		self.torrentPeers = {}
+		self.chunks = []
 
 	def initArray(self,Object):
 		self.torrentFile = Object
@@ -28,6 +34,9 @@ class Peer(object):
 	def get_file(self):
 		return self.torrentFile
 
+	def chunk_rounds(self):
+		return self.chunks
+
 	def pull(self,chunk_id):
 		return self.torrentFile[chunk_id]
 
@@ -37,23 +46,24 @@ class Peer(object):
 			print self.id +  str(self.torrentFile)
 
 	def pushGossip(self): #deliver
+		self.chunks.append(sum(x is not None for x in self.torrentFile))
 
 		if self.torrentPeers != None:
 
 			if self.proxy in self.torrentPeers:
-				randomPeers = random.sample(self.torrentPeers, 3)
+				randomPeers = random.sample(self.torrentPeers, 1)
 
-				if self.proxy in randomPeers:
+				for peer in randomPeers:
+					if self.proxy in randomPeers:
 
-					newPeers = copy.copy(self.torrentPeers)
-					newPeers.pop(self.proxy)
-					randomPeers = random.sample(newPeers, 3)
+						newPeers = copy.copy(self.torrentPeers)
+						newPeers.pop(self.proxy)
+						randomPeers = random.sample(newPeers, 1)
 
-					peer = random.sample(randomPeers,1)
-
+					sleep(0.2)
 					# PUSH - GOSSIP method:(self send chunk to random peer of randoms)
 					randomPosition = random.randint(0, 8)
-					peer[0].push(randomPosition, self.torrentFile[randomPosition])
+					peer.push(randomPosition, self.torrentFile[randomPosition])
 
 
 	def pullGossip(self): #ask
@@ -64,30 +74,32 @@ class Peer(object):
 			self.position = 0
 
 			if self.proxy in self.torrentPeers:
-				randomPeer = random.sample(self.torrentPeers, 1)
+				randomPeers = random.sample(self.torrentPeers, 1)
 
-				for chunk in self.torrentFile:
+				for randomPeer in randomPeers:
+					self.position = 0
+					for chunk in self.torrentFile:
 
-					if chunk == None:
-						self.peersNoneChunks.append(self.position)
+						if chunk == None:
+							self.peersNoneChunks.append(self.position)
 
-					self.position = self.position + 1
+						self.position = self.position + 1
 
-				if len(self.peersNoneChunks) > 0:
-					randomPosition = random.sample(self.peersNoneChunks, 1)
+					if len(self.peersNoneChunks) > 0:
+						randomPosition = random.sample(self.peersNoneChunks, 1)
 
-					# PULL - GOSSIP method: (self ask for random not None chunk to random peer)
-					chunk = randomPeer[0].pull(randomPosition[0],future = True) #use a FUTURE, for not get None chunk
+						# PULL - GOSSIP method: (self ask for random not None chunk to random peer)
+						chunk = randomPeer.pull(randomPosition[0],future = True) #use a FUTURE, for not get None chunk
 
-					sleep(0.3)
-					if chunk.done():
-						try:
-							if chunk.result() != None:
-								file = self.torrentFile
-								file[randomPosition[0]] = chunk.result()
-							print "PULL " + self.id + " ---------> " + str(chunk.result())
-						except Exception, e:
-							print e
+						sleep(0.3)
+						if chunk.done():
+							try:
+								if chunk.result() != None:
+									file = self.torrentFile
+									file[randomPosition[0]] = chunk.result()
+								print "PULL " + self.id + " ---------> " + str(chunk.result())
+							except Exception, e:
+								print e
 
 	#INTERVALS:
 	def init_start(self,torrent):
@@ -186,9 +198,56 @@ if __name__ == '__main__':
 
 	print "-----------"
 	print "p1: " + str(p1.get_file())
+	print "p1: " + str(p1.chunk_rounds())
+
 	print "p2: " + str(p2.get_file())
+	print "p2: " + str(p2.chunk_rounds())
+
 	print "p3: " + str(p3.get_file())
+	print "p3: " + str(p3.chunk_rounds())
+
 	print "p4: " + str(p4.get_file())
+	print "p4: " + str(p4.chunk_rounds())
+
 	print "p5: " + str(p5.get_file())
+	print "p5: " + str(p5.chunk_rounds())
+
+	plotly.tools.set_credentials_file(username='ArnauMarti', api_key='UZWivMWZggFo2kO5WezX')
+
+	x1 =	list(range(len(p1.chunk_rounds())))
+	y1 = p1.chunk_rounds()
+
+	x2 =	list(range(len(p2.chunk_rounds())))
+	y2 = p2.chunk_rounds()
+
+	x3 =	list(range(len(p3.chunk_rounds())))
+	y3 = p3.chunk_rounds()
+
+	x4 =	list(range(len(p4.chunk_rounds())))
+	y4 = p4.chunk_rounds()
+
+	x5 =	list(range(len(p5.chunk_rounds())))
+	y5 = p5.chunk_rounds()
+
+	# Create a trace
+	trace0 = go.Scatter(
+		x=x1,
+		y=y1,
+		name = "peer1"
+	)
+	trace1 = go.Scatter(
+		x=x2,
+		y=y2,
+		name = "peer2"
+	)
+	trace2 = go.Scatter(
+		x=x3,
+		y=y3,
+		name = "peer3"
+	)
+
+	data = [trace0, trace1, trace2]
+
+	py.iplot(data)
 
 shutdown()
