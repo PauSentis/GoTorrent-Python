@@ -28,7 +28,6 @@ class Peer(object):
 		self.torrentFile = Object
 
 	def announce(self,tracker,torrent):
-		self.torrentPeers = t.getPeers(torrent)
 		tracker.announce(torrent,self.proxy,10) #ref
 
 	def get_file(self):
@@ -45,20 +44,21 @@ class Peer(object):
 			self.torrentFile[chunk_id] = chunk_data
 			print self.id +  str(self.torrentFile)
 
-	def pushGossip(self): #deliver
+	def pushGossip(self,torrent): #deliver
+		self.torrentPeers = t.getPeers(torrent)
 		self.chunks.append(sum(x is not None for x in self.torrentFile))
 
 		if self.torrentPeers != None:
 
 			if self.proxy in self.torrentPeers:
-				randomPeers = random.sample(self.torrentPeers, 1)
+				randomPeers = random.sample(self.torrentPeers, 2)
 
 				for peer in randomPeers:
 					if self.proxy in randomPeers:
 
 						newPeers = copy.copy(self.torrentPeers)
 						newPeers.pop(self.proxy)
-						randomPeers = random.sample(newPeers, 1)
+						randomPeers = random.sample(newPeers, 2)
 
 					sleep(0.2)
 					# PUSH - GOSSIP method:(self send chunk to random peer of randoms)
@@ -66,15 +66,15 @@ class Peer(object):
 					peer.push(randomPosition, self.torrentFile[randomPosition])
 
 
-	def pullGossip(self): #ask
-
+	def pullGossip(self,torrent): #ask
+		self.torrentPeers = t.getPeers(torrent)
 		if self.torrentPeers != None:
 
 			self.peersNoneChunks = []
 			self.position = 0
 
 			if self.proxy in self.torrentPeers:
-				randomPeers = random.sample(self.torrentPeers, 1)
+				randomPeers = random.sample(self.torrentPeers, 2)
 
 				for randomPeer in randomPeers:
 					self.position = 0
@@ -104,10 +104,11 @@ class Peer(object):
 	#INTERVALS:
 	def init_start(self,torrent):
 		self.peerAnounce = interval(h, 6, self.proxy, "announce", t,torrent)
-		self.peerPush = interval(h, 1, self.proxy, "pushGossip")
+		self.peerPush = interval(h, 1, self.proxy, "pushGossip",torrent)
+
 
 		if self.proxy != ps:
-			self.peerPull = interval(h, 2, self.proxy, "pullGossip")
+			self.peerPull = interval(h, 1, self.proxy, "pullGossip",torrent)
 
 		later(60, self.proxy, "stop_interval")
 
@@ -194,7 +195,7 @@ if __name__ == '__main__':
 	sleep(0.1)
 	t.init_start("movie")
 
-	sleep(63)
+	sleep(65)
 
 	print "-----------"
 	print "p1: " + str(p1.get_file())
@@ -245,9 +246,26 @@ if __name__ == '__main__':
 		y=y3,
 		name = "peer3"
 	)
+	trace3 = go.Scatter(
+		x=x4,
+		y=y4,
+		name = "peer4"
+	)
+	trace4 = go.Scatter(
+		x=x5,
+		y=y5,
+		name = "peer5"
+	)
 
-	data = [trace0, trace1, trace2]
+	data = [trace0, trace1, trace2,trace3,trace4]
+	# Edit the layout
+	layout = dict(title='pull/push-2',
+				  xaxis=dict(title='Time'),
+				  yaxis=dict(title='Chunk'),
+				  )
 
-	py.iplot(data)
+	fig = dict(data=data, layout=layout)
+	py.iplot(fig, filename='PullPush2')
+
 
 shutdown()
