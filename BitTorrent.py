@@ -67,39 +67,49 @@ class Peer(object):
 
 
 	def pullGossip(self,torrent): #ask
-		self.torrentPeers = t.getPeers(torrent)
-		if self.torrentPeers != None:
+		self.peersNoneChunks = []
+		self.position = 0
+		for chunk in self.torrentFile:
 
-			self.peersNoneChunks = []
-			self.position = 0
+			if chunk == None:
+				self.peersNoneChunks.append(self.position)
 
-			if self.proxy in self.torrentPeers:
-				randomPeers = random.sample(self.torrentPeers, 2)
+			self.position = self.position + 1
 
-				for randomPeer in randomPeers:
-					self.position = 0
-					for chunk in self.torrentFile:
+		if self.position != 0:
+			self.torrentPeers = t.getPeers(torrent)
+			if self.torrentPeers != None:
 
-						if chunk == None:
-							self.peersNoneChunks.append(self.position)
+				self.peersNoneChunks = []
+				self.position = 0
 
-						self.position = self.position + 1
+				if self.proxy in self.torrentPeers:
+					randomPeers = random.sample(self.torrentPeers, 2)
 
-					if len(self.peersNoneChunks) > 0:
-						randomPosition = random.sample(self.peersNoneChunks, 1)
+					for randomPeer in randomPeers:
+						self.position = 0
+						for chunk in self.torrentFile:
 
-						# PULL - GOSSIP method: (self ask for random not None chunk to random peer)
-						chunk = randomPeer.pull(randomPosition[0],future = True) #use a FUTURE, for not get None chunk
+							if chunk == None:
+								self.peersNoneChunks.append(self.position)
 
-						sleep(0.3)
-						if chunk.done():
-							try:
-								if chunk.result() != None:
-									file = self.torrentFile
-									file[randomPosition[0]] = chunk.result()
-								print "PULL " + self.id + " ---------> " + str(chunk.result())
-							except Exception, e:
-								print e
+							self.position = self.position + 1
+
+						if len(self.peersNoneChunks) > 0:
+							randomPosition = random.sample(self.peersNoneChunks, 1)
+
+							# PULL - GOSSIP method: (self ask for random not None chunk to random peer)
+							chunk = randomPeer.pull(randomPosition[0],future = True) #use a FUTURE, for not get None chunk
+
+							sleep(0.3)
+							if chunk.done():
+								try:
+									if chunk.result() != None:
+										file = self.torrentFile
+										file[randomPosition[0]] = chunk.result()
+									print "PULL " + self.id + " ---------> " + str(chunk.result())
+								except Exception, e:
+									print e
 
 	#INTERVALS:
 	def init_start(self,torrent):
@@ -165,12 +175,40 @@ if __name__ == '__main__':
 	set_context()
 	h = create_host()
 
+	peersList = []
+
 	t = h.spawn("tracker1",Tracker)
 
-	ps = h.spawn("peerSeed",Peer)
-	p1 = h.spawn("peer1",Peer)
+	ps = h.spawn("peerSeed", Peer)
+	ps.initArray(["G", "O", "T", "O", "R", "R", "E", "N", "T"])
+	ps.init_start("movie")
+
+	for x in range(1,100):
+		p = h.spawn("peer" + str(x), Peer)
+		p.initArray([None, None, None, None, None, None, None, None, None])
+		p.init_start("movie")
+		peersList.append(p)
+		#sleep(0.3)
+
+	sleep(65)
+
+	print "----------------------------"
+
+	for peer in peersList:
+		print peer.get_id() + str(peer.get_file())
+
+
+
+
+
+
+
+
+	'''
+	ps = h.spawn("peerSeed", Peer)
+	p1 = h.spawn("peer1", Peer)
 	p2 = h.spawn("peer2", Peer)
-	p3 = h.spawn("peer3",Peer)
+	p3 = h.spawn("peer3", Peer)
 	p4 = h.spawn("peer4", Peer)
 	p5 = h.spawn("peer5", Peer)
 
@@ -195,8 +233,6 @@ if __name__ == '__main__':
 	sleep(0.1)
 	t.init_start("movie")
 
-	sleep(65)
-
 	print "-----------"
 	print "p1: " + str(p1.get_file())
 	print "p1: " + str(p1.chunk_rounds())
@@ -212,7 +248,10 @@ if __name__ == '__main__':
 
 	print "p5: " + str(p5.get_file())
 	print "p5: " + str(p5.chunk_rounds())
+	'''
 
+
+	'''
 	plotly.tools.set_credentials_file(username='ArnauMarti', api_key='UZWivMWZggFo2kO5WezX')
 
 	x1 =	list(range(len(p1.chunk_rounds())))
@@ -231,6 +270,8 @@ if __name__ == '__main__':
 	y5 = p5.chunk_rounds()
 
 	# Create a trace
+
+
 	trace0 = go.Scatter(
 		x=x1,
 		y=y1,
@@ -266,6 +307,6 @@ if __name__ == '__main__':
 
 	fig = dict(data=data, layout=layout)
 	py.iplot(fig, filename='PullPush2')
-
+	'''
 
 shutdown()
