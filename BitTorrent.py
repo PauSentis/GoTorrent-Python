@@ -28,7 +28,7 @@ class Peer(object):
 		self.torrentFile = Object
 
 	def announce(self,tracker,torrent):
-		tracker.announce(torrent,self.proxy,10) #ref
+		tracker.announce(torrent,self.proxy,11)
 
 	def get_file(self):
 		return self.torrentFile
@@ -113,7 +113,7 @@ class Peer(object):
 
 	#INTERVALS:
 	def init_start(self,torrent):
-		self.peerAnounce = interval(h, 6, self.proxy, "announce", t,torrent)
+		self.peerAnounce = interval(h, 10, self.proxy, "announce", t,torrent)
 		self.peerPush = interval(h, 1, self.proxy, "pushGossip",torrent)
 
 
@@ -127,6 +127,7 @@ class Peer(object):
 		self.peerPull.set()
 		self.peerPush.set()
 		self.peerAnounce.set()
+
 
 class Tracker(object):
 	_tell = ["announce","trackerTimeCheck","init_start","stop_interval"]
@@ -151,11 +152,15 @@ class Tracker(object):
 				self.announce(torrent, peer, time - 1)
 
 				if time < 1:
+					peer.stop_interval()
 					deadPeers.setdefault(torrent, []).append(peer)
 
 			for torrent in deadPeers.keys():
 				for peer in deadPeers.get(torrent):
 					self.torrents.get(torrent).pop(peer,None)
+					print "KICKED:" + peer.get_id()
+					peer.stop_interval()
+
 
 
 
@@ -178,24 +183,28 @@ if __name__ == '__main__':
 	peersList = []
 
 	t = h.spawn("tracker1",Tracker)
+	t.init_start("movie")
 
-	ps = h.spawn("peerSeed", Peer)
+	ps = h.spawn("Seed", Peer)
 	ps.initArray(["G", "O", "T", "O", "R", "R", "E", "N", "T"])
 	ps.init_start("movie")
 
-	for x in range(1,100):
+	for x in range(1,5):
 		p = h.spawn("peer" + str(x), Peer)
 		p.initArray([None, None, None, None, None, None, None, None, None])
 		p.init_start("movie")
 		peersList.append(p)
-		#sleep(0.3)
+		sleep(0.1)
+
 
 	sleep(65)
 
 	print "----------------------------"
 
-	for peer in peersList:
-		print peer.get_id() + str(peer.get_file())
+	for peer in t.getPeers("movie"):
+
+		if peer.get_id() != "Seed":
+			print peer.get_id() + str(peer.get_file())
 
 
 
