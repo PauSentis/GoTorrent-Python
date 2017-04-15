@@ -1,9 +1,9 @@
 from pyactor.context import set_context, create_host, sleep, shutdown, interval, later
 
-import plotly.plotly as py
-import plotly.graph_objs as go
+#import plotly.plotly as py
+#import plotly.graph_objs as go
 
-import plotly
+#import plotly
 import random
 import copy
 
@@ -18,6 +18,7 @@ import copy
 class Peer(object):
 	_tell = ["pushGossip","pullGossip","push","init_start","stop_interval","announce"]
 	_ask = ["initArray","get_file","pull","chunk_rounds"]
+
 
 	def __init__(self):
 		self.torrentFile = []
@@ -41,11 +42,17 @@ class Peer(object):
 
 	def push(self,chunk_id, chunk_data):
 		if self.torrentFile[chunk_id] == None:
-			self.torrentFile[chunk_id] = chunk_data
-			print self.id +  str(self.torrentFile)
+			if chunk_data != None:
+				self.torrentFile[chunk_id] = chunk_data
+				print "PUSH: "+self.id +" has received "+str(chunk_data)+ " --->"+  str(self.torrentFile)
 
 	def pushGossip(self,torrent): #deliver
-		self.torrentPeers = t.getPeers(torrent)
+		try:
+			self.torrentPeers = t.getPeers(torrent)
+		except Exception:
+			pass
+			
+
 		self.chunks.append(sum(x is not None for x in self.torrentFile))
 
 		if self.torrentPeers != None:
@@ -62,7 +69,7 @@ class Peer(object):
 
 					sleep(0.2)
 					# PUSH - GOSSIP method:(self send chunk to random peer of randoms)
-					randomPosition = random.randint(0, 8)
+					randomPosition = random.randint(0, len(self.torrentFile)-1)
 					peer.push(randomPosition, self.torrentFile[randomPosition])
 
 
@@ -77,13 +84,21 @@ class Peer(object):
 			self.position = self.position + 1
 
 		if self.position != 0:
+
+			try:
+				self.torrentPeers = t.getPeers(torrent)
+			except Exception:
+				pass
+
 			self.torrentPeers = t.getPeers(torrent)
+
 			if self.torrentPeers != None:
 
 				self.peersNoneChunks = []
 				self.position = 0
 
 				if self.proxy in self.torrentPeers:
+
 					randomPeers = random.sample(self.torrentPeers, 2)
 
 					for randomPeer in randomPeers:
@@ -107,7 +122,7 @@ class Peer(object):
 									if chunk.result() != None:
 										file = self.torrentFile
 										file[randomPosition[0]] = chunk.result()
-									print "PULL " + self.id + " ---------> " + str(chunk.result())
+										print "PULL: " + self.id + " has received "+str(chunk.result())+" --->"+  str(self.torrentFile)
 								except Exception, e:
 									print e
 
@@ -118,13 +133,16 @@ class Peer(object):
 
 
 		if self.proxy != ps:
-			self.peerPull = interval(h, 1, self.proxy, "pullGossip",torrent)
+			self.peerPull = interval(h, 10, self.proxy, "pullGossip",torrent)
 
-		later(60, self.proxy, "stop_interval")
+		later(59, self.proxy, "stop_interval")
 
 	def stop_interval(self):
-		print "stopping interval"
-		self.peerPull.set()
+		print self.id+": stopping interval"
+
+		if self.proxy != ps:
+			self.peerPull.set()
+
 		self.peerPush.set()
 		self.peerAnounce.set()
 
@@ -148,10 +166,9 @@ class Tracker(object):
 		if self.torrents.get(torrent) != None:
 			for peer in  self.torrents.get(torrent):
 
-				time = self.torrents.get(torrent)[peer]
-				self.announce(torrent, peer, time - 1)
+				self.announce(torrent, peer, self.torrents.get(torrent)[peer] - 1)
 
-				if time < 1:
+				if self.torrents.get(torrent)[peer] < 1:
 					peer.stop_interval()
 					deadPeers.setdefault(torrent, []).append(peer)
 
@@ -171,7 +188,7 @@ class Tracker(object):
 		later(60, self.proxy, "stop_interval")
 
 	def stop_interval(self):
-		print "stopping interval"
+		print "Tracker: stopping interval"
 		self.timeCheck.set()
 
 
@@ -189,7 +206,7 @@ if __name__ == '__main__':
 	ps.initArray(["G", "O", "T", "O", "R", "R", "E", "N", "T"])
 	ps.init_start("movie")
 
-	for x in range(1,5):
+	for x in range(1,6):
 		p = h.spawn("peer" + str(x), Peer)
 		p.initArray([None, None, None, None, None, None, None, None, None])
 		p.init_start("movie")
@@ -197,7 +214,7 @@ if __name__ == '__main__':
 		sleep(0.1)
 
 
-	sleep(65)
+	sleep(61)
 
 	print "----------------------------"
 
