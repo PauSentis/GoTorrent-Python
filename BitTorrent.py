@@ -133,7 +133,7 @@ class Peer(object):
 
 
 		if self.proxy != ps:
-			self.peerPull = interval(h, 10, self.proxy, "pullGossip",torrent)
+			self.peerPull = interval(h, 1, self.proxy, "pullGossip",torrent)
 
 		later(59, self.proxy, "stop_interval")
 
