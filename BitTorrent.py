@@ -131,7 +131,7 @@ class Peer(object):
 
 	#INTERVALS:
 	def init_start(self,torrent):
-		self.peerAnounce = interval(h, 10, self.proxy, "announce", t,torrent)
+		self.peerAnounce = interval(h, 6, self.proxy, "announce", t,torrent)
 		self.peerPush = interval(h, 1, self.proxy, "pushGossip",torrent)
 
 
@@ -225,11 +225,6 @@ if __name__ == '__main__':
 
 		if peer.get_id() != "Seed":
 			print peer.get_id() + str(peer.get_file())
-
-
-
-
-
 
 
 
