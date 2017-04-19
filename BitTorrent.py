@@ -59,14 +59,13 @@ class Peer(object):
 
 			if self.proxy in self.torrentPeers:
 				randomPeers = random.sample(self.torrentPeers, 2)
-
-				for peer in randomPeers:
-					if self.proxy in randomPeers:
+				if self.proxy in randomPeers:
 
 						newPeers = copy.copy(self.torrentPeers)
 						newPeers.pop(self.proxy)
 						randomPeers = random.sample(newPeers, 2)
 
+				for peer in randomPeers:
 					sleep(0.2)
 					# PUSH - GOSSIP method:(self send chunk to random peer of randoms)
 					randomPosition = random.randint(0, len(self.torrentFile)-1)
@@ -90,7 +89,6 @@ class Peer(object):
 			except Exception:
 				pass
 
-			self.torrentPeers = t.getPeers(torrent)
 
 			if self.torrentPeers != None:
 
@@ -100,6 +98,11 @@ class Peer(object):
 				if self.proxy in self.torrentPeers:
 
 					randomPeers = random.sample(self.torrentPeers, 2)
+
+					if self.proxy in randomPeers:
+						newPeers = copy.copy(self.torrentPeers)
+						newPeers.pop(self.proxy)
+						randomPeers = random.sample(newPeers, 2)
 
 					for randomPeer in randomPeers:
 						self.position = 0
@@ -135,7 +138,7 @@ class Peer(object):
 		if self.proxy != ps:
 			self.peerPull = interval(h, 1, self.proxy, "pullGossip",torrent)
 
-		later(59, self.proxy, "stop_interval")
+		later(60, self.proxy, "stop_interval")
 
 	def stop_interval(self):
 		print self.id+": stopping interval"
@@ -214,7 +217,7 @@ if __name__ == '__main__':
 		sleep(0.1)
 
 
-	sleep(61)
+	sleep(65)
 
 	print "----------------------------"
 
